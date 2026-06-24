@@ -1,65 +1,33 @@
-import streamlit as st
+from fastapi import FastAPI, File, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 import tensorflow as tf
 import numpy as np
 from PIL import Image
-from tensorflow.keras.applications.efficientnet import preprocess_input
+import io
 
-# ---------------- PAGE CONFIG ---------------- #
+app = FastAPI()
 
-st.set_page_config(
-    page_title="AI Skin Disease Classifier",
-    page_icon="🩺",
-    layout="wide"
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# ---------------- CUSTOM CSS ---------------- #
+model = tf.keras.models.load_model("skin_model.h5")
 
-st.markdown("""
-<style>
-.main {
-    padding-top: 2rem;
-}
+class_names = [
+    "akiec",
+    "bcc",
+    "bkl",
+    "df",
+    "mel",
+    "nv",
+    "vasc"
+]
 
-.big-title {
-    text-align: center;
-    font-size: 42px;
-    font-weight: bold;
-    color: #1E88E5;
-}
-
-.sub-title {
-    text-align: center;
-    font-size: 18px;
-    color: gray;
-    margin-bottom: 30px;
-}
-
-.result-box {
-    padding: 15px;
-    border-radius: 10px;
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-}
-</style>
-""", unsafe_allow_html=True)
-
-# ---------------- MODEL ---------------- #
-
-@st.cache_resource
-def load_skin_model():
-    try:
-        model = tf.keras.models.load_model("skin_model.h5")
-        st.success("✅ Model loaded successfully")
-        return model
-    except Exception as e:
-        st.error(f"❌ Model loading failed: {e}")
-        st.stop()
-
-model = load_skin_model()
-
-# ---------------- LABELS ---------------- #
-
-class_names = {
+full_names = {
     "akiec": "Actinic Keratoses",
     "bcc": "Basal Cell Carcinoma",
     "bkl": "Benign Keratosis",
@@ -69,99 +37,50 @@ class_names = {
     "vasc": "Vascular Lesion"
 }
 
-labels = list(class_names.keys())
 
-# ---------------- HEADER ---------------- #
+@app.get("/")
+def home():
+    return {"message": "Skin Disease API Running"}
 
-st.markdown(
-    '<div class="big-title">🩺 AI Skin Disease Classification System</div>',
-    unsafe_allow_html=True
-)
 
-st.markdown(
-    '<div class="sub-title">Deep Learning Based Skin Disease Prediction using EfficientNetB0</div>',
-    unsafe_allow_html=True
-)
+@app.post("/predict")
+async def predict(file: UploadFile = File(...)):
+    
+    image_bytes = await file.read()
 
-st.divider()
+    image = Image.open(io.BytesIO(image_bytes))
+    image = image.convert("RGB")
+    image = image.resize((224, 224))
 
-# ---------------- MAIN UI ---------------- #
+    img = np.array(image).astype(np.float32)
 
-left, right = st.columns([1, 1])
+    img = tf.keras.applications.efficientnet.preprocess_input(img)
 
-with left:
+    img = np.expand_dims(img, axis=0)
 
-    uploaded_file = st.file_uploader(
-        "📤 Upload a Skin Image",
-        type=["jpg", "jpeg", "png"]
-    )
+    prediction = model.predict(img)
 
-    if uploaded_file:
+    predicted_index = int(np.argmax(prediction))
 
-        image = Image.open(uploaded_file).convert("RGB")
+    confidence = float(np.max(prediction)) * 100
 
-        st.image(
-            image,
-            caption="Uploaded Image",
-            use_container_width=True
-        )
+    if confidence < 60:
+        return {
+            "prediction": "Unknown",
+            "confidence": confidence,
+            "message": "Please upload a valid skin lesion image."
+        }
+    disease_code = class_names[predicted_index]
 
-with right:
+    return {
+        "prediction": full_names[disease_code],
+        "confidence": round(confidence, 2),
+        "probabilities": {
+            class_names[i]: float(prediction[0][i] * 100)
+            for i in range(len(class_names))
+        }
+    }
+import uvicorn
 
-    if uploaded_file:
-
-        img = image.resize((224, 224))
-        img = np.array(img).astype(np.float32)
-
-        img = preprocess_input(img)
-
-        img = np.expand_dims(
-            img,
-            axis=0
-        )
-
-        with st.spinner("Analyzing image..."):
-            prediction = model.predict(
-                img,
-                verbose=0
-            )
-
-        predicted_class = labels[np.argmax(prediction)]
-
-        confidence = float(np.max(prediction) * 100)
-
-        st.success("Prediction Completed")
-
-        st.markdown("### Prediction Result")
-
-        st.markdown(
-            f"""
-            <div class="result-box">
-            <h3>{class_names[predicted_class]}</h3>
-            <h4>Confidence: {confidence:.2f}%</h4>
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-        st.progress(
-            min(int(confidence), 100)
-        )
-
-        st.markdown("### Probability Distribution")
-
-        probs = prediction[0]
-
-        for i, label in enumerate(labels):
-
-            st.write(
-                f"{class_names[label]} : {probs[i]*100:.2f}%"
-            )
-
-# ---------------- FOOTER ---------------- #
-
-st.divider()
-
-st.caption(
-    "Developed using TensorFlow, EfficientNetB0, Streamlit and HAM10000 Dataset"
-)
+if __name__ == "__main__":
+    uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -97,7 +97,7 @@ export default function UploadPage() {
     formData.append('file', blob, 'image.png')
 
     const result = await fetch(
-      'http://127.0.0.1:8000/predict',
+      'https://skin-disease-classifier-t3d1.onrender.com/predict',
       {
         method: 'POST',
         body: formData,

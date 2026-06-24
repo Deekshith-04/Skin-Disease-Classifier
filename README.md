@@ -101,34 +101,6 @@ Confidence & Probabilities
 
 ---
 
-## 📷 Screenshots
-
-### Home Page
-
-![Home Page](screenshots/home-page.png)
-
-### Upload Page
-
-![Upload Page](screenshots/upload-page.png)
-
-### Analysis Page
-
-![Analysis Page](screenshots/analysis-page.png)
-
-### Results Page
-
-![Results Page](screenshots/results-page.png)
-
-### Invalid Image Detection
-
-![Invalid Page](screenshots/invalid-page.png)
-
-### History Page
-
-![History Page](screenshots/history-page.png)
-
----
-
 ## 📈 Model Information
 
 ### Architecture

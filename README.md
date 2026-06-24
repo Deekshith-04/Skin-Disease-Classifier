@@ -6,7 +6,9 @@ An AI-powered web application for skin disease classification using Deep Learnin
 
 ## 🌐 Live Demo
 
-🔗 Demo: https://your-demo-link.vercel.app
+🔗 Demo: https://skin-disease-classification04.vercel.app/
+
+🔗 Swagger Docs: https://skin-disease-classifier-t3x1.onrender.com/docs
 
 ---
 
